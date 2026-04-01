@@ -1,0 +1,15 @@
+[workspace]
+members = ["openai", "openai-azure"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+
+[workspace.lints.rust]
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+correctness = "deny"
+suspicious = "warn"
+style = "warn"
+perf = "warn"

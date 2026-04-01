@@ -1,0 +1,18 @@
+[package]
+name = "openai-azure"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Azure OpenAI helpers for the openai crate"
+
+[lints]
+workspace = true
+
+[dependencies]
+openai = { path = "../openai", default-features = false, optional = true }
+azure_core = { version = "0.22", optional = true }
+
+[features]
+default = []
+config = ["dep:openai"]
+azure = ["config", "dep:azure_core"]
