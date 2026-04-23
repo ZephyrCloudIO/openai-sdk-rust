@@ -7,7 +7,7 @@ use std::{
 
 use eventsource_stream::Eventsource;
 use futures::{Stream, StreamExt};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{Error, Result};
 
@@ -59,7 +59,7 @@ fn extract_error_message(data: &str) -> String {
 
 fn parse_event_payload<T>(event_type: &str, data: &str) -> ParseEventAction<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + Serialize,
 {
     let payload = normalize_payload(data);
 
@@ -75,7 +75,13 @@ where
         return ParseEventAction::Yield(Err(Error::Stream(extract_error_message(&payload))));
     }
 
-    ParseEventAction::Yield(serde_json::from_str::<T>(&payload).map_err(Error::Json))
+    match serde_json::from_str::<T>(&payload) {
+        Ok(value) => {
+            crate::raw_json::register_raw_json(&value, &payload);
+            ParseEventAction::Yield(Ok(value))
+        }
+        Err(err) => ParseEventAction::Yield(Err(Error::Json(err))),
+    }
 }
 
 /// Generic SSE stream for API events.
@@ -85,7 +91,7 @@ pub struct SseStream<T> {
 
 impl<T> SseStream<T>
 where
-    T: DeserializeOwned + Send + 'static,
+    T: DeserializeOwned + Serialize + Send + 'static,
 {
     /// Builds an SSE stream from an HTTP response body stream.
     #[must_use]
@@ -131,7 +137,7 @@ impl<T> Stream for SseStream<T> {
 mod tests {
     use crate::Error;
 
-    #[derive(Debug, serde::Deserialize, PartialEq, Eq)]
+    #[derive(Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
     struct TestChunk {
         token: String,
     }
@@ -190,6 +196,40 @@ mod tests {
                 }
             ),
             _ => panic!("expected successful payload"),
+        }
+    }
+
+    // --- Proptest fuzz tests ---
+
+    mod fuzz {
+        use proptest::prelude::*;
+
+        #[derive(Debug, serde::Serialize, serde::Deserialize)]
+        #[allow(dead_code)]
+        struct AnyChunk {
+            #[serde(default)]
+            value: Option<String>,
+        }
+
+        proptest! {
+            #[test]
+            fn parse_event_payload_never_panics(
+                event_type in ".*",
+                data in ".*",
+            ) {
+                // We only care that it does not panic; the result is irrelevant.
+                let _ = super::super::parse_event_payload::<AnyChunk>(&event_type, &data);
+            }
+
+            #[test]
+            fn normalize_payload_never_panics(data in ".*") {
+                let _ = super::super::normalize_payload(&data);
+            }
+
+            #[test]
+            fn extract_error_message_never_panics(data in ".*") {
+                let _ = super::super::extract_error_message(&data);
+            }
         }
     }
 }

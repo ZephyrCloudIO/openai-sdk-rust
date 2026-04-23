@@ -40,6 +40,10 @@ impl GraderModelService {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Grader input types
+// ---------------------------------------------------------------------------
+
 /// Input content type used for grading.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -98,9 +102,405 @@ pub struct GraderResponse {
     pub results: Vec<GraderResult>,
 }
 
+// ===========================================================================
+// Grader model types
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// StringCheckGrader
+// ---------------------------------------------------------------------------
+
+/// The string check operation to perform.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StringCheckGraderOperation {
+    /// Exact equality.
+    Eq,
+    /// Not equal.
+    Ne,
+    /// SQL-style LIKE (case-sensitive).
+    Like,
+    /// SQL-style ILIKE (case-insensitive).
+    Ilike,
+}
+
+/// A `StringCheckGrader` object that performs a string comparison between input and
+/// reference using a specified operation.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StringCheckGrader {
+    /// The input text. This may include template strings.
+    pub input: String,
+    /// The name of the grader.
+    pub name: String,
+    /// The string check operation to perform. One of `eq`, `ne`, `like`, or `ilike`.
+    pub operation: StringCheckGraderOperation,
+    /// The reference text. This may include template strings.
+    pub reference: String,
+    /// The object type, which is always `string_check`.
+    #[serde(rename = "type", default = "default_string_check_type")]
+    pub grader_type: String,
+}
+
+fn default_string_check_type() -> String {
+    "string_check".to_owned()
+}
+
+// ---------------------------------------------------------------------------
+// TextSimilarityGrader
+// ---------------------------------------------------------------------------
+
+/// The evaluation metric to use for text similarity.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum TextSimilarityGraderEvaluationMetric {
+    /// Cosine similarity.
+    #[serde(rename = "cosine")]
+    Cosine,
+    /// Fuzzy string match.
+    #[serde(rename = "fuzzy_match")]
+    FuzzyMatch,
+    /// BLEU score.
+    #[serde(rename = "bleu")]
+    Bleu,
+    /// GLEU score.
+    #[serde(rename = "gleu")]
+    Gleu,
+    /// METEOR score.
+    #[serde(rename = "meteor")]
+    Meteor,
+    /// ROUGE-1 score.
+    #[serde(rename = "rouge_1")]
+    Rouge1,
+    /// ROUGE-2 score.
+    #[serde(rename = "rouge_2")]
+    Rouge2,
+    /// ROUGE-3 score.
+    #[serde(rename = "rouge_3")]
+    Rouge3,
+    /// ROUGE-4 score.
+    #[serde(rename = "rouge_4")]
+    Rouge4,
+    /// ROUGE-5 score.
+    #[serde(rename = "rouge_5")]
+    Rouge5,
+    /// ROUGE-L score.
+    #[serde(rename = "rouge_l")]
+    RougeL,
+}
+
+/// A `TextSimilarityGrader` object which grades text based on similarity metrics.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TextSimilarityGrader {
+    /// The evaluation metric to use.
+    pub evaluation_metric: TextSimilarityGraderEvaluationMetric,
+    /// The text being graded.
+    pub input: String,
+    /// The name of the grader.
+    pub name: String,
+    /// The text being graded against.
+    pub reference: String,
+    /// The type of grader, which is always `text_similarity`.
+    #[serde(rename = "type", default = "default_text_similarity_type")]
+    pub grader_type: String,
+}
+
+fn default_text_similarity_type() -> String {
+    "text_similarity".to_owned()
+}
+
+// ---------------------------------------------------------------------------
+// PythonGrader
+// ---------------------------------------------------------------------------
+
+/// A `PythonGrader` object that runs a python script on the input.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PythonGrader {
+    /// The name of the grader.
+    pub name: String,
+    /// The source code of the python script.
+    pub source: String,
+    /// The object type, which is always `python`.
+    #[serde(rename = "type", default = "default_python_type")]
+    pub grader_type: String,
+    /// The image tag to use for the python script.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_tag: Option<String>,
+}
+
+fn default_python_type() -> String {
+    "python".to_owned()
+}
+
+// ---------------------------------------------------------------------------
+// ScoreModelGrader
+// ---------------------------------------------------------------------------
+
+/// The role of a model grader input message.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScoreModelGraderInputRole {
+    /// User role.
+    User,
+    /// Assistant role.
+    Assistant,
+    /// System role.
+    System,
+    /// Developer role.
+    Developer,
+}
+
+/// Content of a score model grader input message.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum ScoreModelGraderInputContent {
+    /// Simple string content.
+    Text(String),
+    /// Array of grader input items.
+    Items(Vec<GraderInput>),
+}
+
+/// A message input to the model with a role.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ScoreModelGraderInput {
+    /// Inputs to the model - can contain template strings.
+    pub content: ScoreModelGraderInputContent,
+    /// The role of the message input.
+    pub role: ScoreModelGraderInputRole,
+    /// The type of the message input. Always `message`.
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub input_type: Option<String>,
+}
+
+/// The sampling parameters for the score model grader.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ScoreModelGraderSamplingParams {
+    /// The maximum number of tokens the grader model may generate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_completions_tokens: Option<i64>,
+    /// Reasoning effort level.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
+    /// A seed value to initialize the randomness.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<i64>,
+    /// A higher temperature increases randomness in the outputs.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    /// An alternative to temperature for nucleus sampling.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_p: Option<f64>,
+}
+
+/// A `ScoreModelGrader` object that uses a model to assign a score to the input.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ScoreModelGrader {
+    /// The input messages evaluated by the grader.
+    pub input: Vec<ScoreModelGraderInput>,
+    /// The model to use for the evaluation.
+    pub model: String,
+    /// The name of the grader.
+    pub name: String,
+    /// The object type, which is always `score_model`.
+    #[serde(rename = "type", default = "default_score_model_type")]
+    pub grader_type: String,
+    /// The range of the score. Defaults to `[0, 1]`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range: Option<Vec<f64>>,
+    /// The sampling parameters for the model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sampling_params: Option<ScoreModelGraderSamplingParams>,
+}
+
+fn default_score_model_type() -> String {
+    "score_model".to_owned()
+}
+
+// ---------------------------------------------------------------------------
+// LabelModelGrader
+// ---------------------------------------------------------------------------
+
+/// Content of a label model grader input message.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum LabelModelGraderInputContent {
+    /// Simple string content.
+    Text(String),
+    /// Array of grader input items.
+    Items(Vec<GraderInput>),
+}
+
+/// A message input to the label model grader.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LabelModelGraderInput {
+    /// Inputs to the model - can contain template strings.
+    pub content: LabelModelGraderInputContent,
+    /// The role of the message input.
+    pub role: ScoreModelGraderInputRole,
+    /// The type of the message input. Always `message`.
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub input_type: Option<String>,
+}
+
+/// A `LabelModelGrader` object which uses a model to assign labels to each item.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LabelModelGrader {
+    /// The input messages evaluated by the grader.
+    pub input: Vec<LabelModelGraderInput>,
+    /// The labels to assign to each item in the evaluation.
+    pub labels: Vec<String>,
+    /// The model to use for the evaluation. Must support structured outputs.
+    pub model: String,
+    /// The name of the grader.
+    pub name: String,
+    /// The labels that indicate a passing result. Must be a subset of labels.
+    pub passing_labels: Vec<String>,
+    /// The object type, which is always `label_model`.
+    #[serde(rename = "type", default = "default_label_model_type")]
+    pub grader_type: String,
+}
+
+fn default_label_model_type() -> String {
+    "label_model".to_owned()
+}
+
+// ---------------------------------------------------------------------------
+// MultiGrader
+// ---------------------------------------------------------------------------
+
+/// A `MultiGrader` object combines the output of multiple graders to produce a
+/// single score.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MultiGrader {
+    /// A formula to calculate the output based on grader results.
+    pub calculate_output: String,
+    /// The sub-graders. Keys are grader names.
+    pub graders: HashMap<String, Grader>,
+    /// The name of the grader.
+    pub name: String,
+    /// The object type, which is always `multi`.
+    #[serde(rename = "type", default = "default_multi_type")]
+    pub grader_type: String,
+}
+
+fn default_multi_type() -> String {
+    "multi".to_owned()
+}
+
+// ---------------------------------------------------------------------------
+// Grader union
+// ---------------------------------------------------------------------------
+
+/// Union of all grader model types. Discriminated by the `type` field.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type")]
+pub enum Grader {
+    /// A string comparison grader.
+    #[serde(rename = "string_check")]
+    StringCheck(StringCheckGraderFields),
+    /// A text similarity grader.
+    #[serde(rename = "text_similarity")]
+    TextSimilarity(TextSimilarityGraderFields),
+    /// A Python script grader.
+    #[serde(rename = "python")]
+    Python(PythonGraderFields),
+    /// A score model grader.
+    #[serde(rename = "score_model")]
+    ScoreModel(ScoreModelGraderFields),
+    /// A label model grader.
+    #[serde(rename = "label_model")]
+    LabelModel(LabelModelGraderFields),
+    /// A multi-grader that combines results.
+    #[serde(rename = "multi")]
+    Multi(MultiGraderFields),
+}
+
+/// Fields for a `StringCheckGrader` inside a `Grader` union.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StringCheckGraderFields {
+    /// The input text.
+    pub input: String,
+    /// The name of the grader.
+    pub name: String,
+    /// The string check operation.
+    pub operation: StringCheckGraderOperation,
+    /// The reference text.
+    pub reference: String,
+}
+
+/// Fields for a `TextSimilarityGrader` inside a `Grader` union.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct TextSimilarityGraderFields {
+    /// The evaluation metric.
+    pub evaluation_metric: TextSimilarityGraderEvaluationMetric,
+    /// The text being graded.
+    pub input: String,
+    /// The name of the grader.
+    pub name: String,
+    /// The text being graded against.
+    pub reference: String,
+}
+
+/// Fields for a `PythonGrader` inside a `Grader` union.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PythonGraderFields {
+    /// The name of the grader.
+    pub name: String,
+    /// The source code of the python script.
+    pub source: String,
+    /// The image tag to use.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_tag: Option<String>,
+}
+
+/// Fields for a `ScoreModelGrader` inside a `Grader` union.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ScoreModelGraderFields {
+    /// The input messages.
+    pub input: Vec<ScoreModelGraderInput>,
+    /// The model to use.
+    pub model: String,
+    /// The name of the grader.
+    pub name: String,
+    /// The score range.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range: Option<Vec<f64>>,
+    /// Sampling parameters.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sampling_params: Option<ScoreModelGraderSamplingParams>,
+}
+
+/// Fields for a `LabelModelGrader` inside a `Grader` union.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LabelModelGraderFields {
+    /// The input messages.
+    pub input: Vec<LabelModelGraderInput>,
+    /// The labels.
+    pub labels: Vec<String>,
+    /// The model.
+    pub model: String,
+    /// The name of the grader.
+    pub name: String,
+    /// The passing labels.
+    pub passing_labels: Vec<String>,
+}
+
+/// Fields for a `MultiGrader` inside a `Grader` union.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MultiGraderFields {
+    /// A formula to calculate the output.
+    pub calculate_output: String,
+    /// The sub-graders.
+    pub graders: HashMap<String, Grader>,
+    /// The name of the grader.
+    pub name: String,
+}
+
+// ===========================================================================
+// Tests
+// ===========================================================================
+
 #[cfg(test)]
 mod tests {
-    use super::{GraderInput, GraderInputType, GraderResponse};
+    use super::*;
 
     #[test]
     fn grader_input_type_serializes_snake_case() {
@@ -138,5 +538,233 @@ mod tests {
             serde_json::from_str(json).expect("deserialize grader response");
         assert_eq!(response.results.len(), 1);
         assert!(response.results[0].pass);
+    }
+
+    #[test]
+    fn string_check_grader_roundtrip() {
+        let grader = StringCheckGrader {
+            input: "{{sample.output_text}}".to_owned(),
+            name: "exact_match".to_owned(),
+            operation: StringCheckGraderOperation::Eq,
+            reference: "expected".to_owned(),
+            grader_type: "string_check".to_owned(),
+        };
+
+        let json = serde_json::to_string(&grader).expect("serialize");
+        let parsed: StringCheckGrader = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.name, "exact_match");
+        assert_eq!(parsed.operation, StringCheckGraderOperation::Eq);
+    }
+
+    #[test]
+    fn text_similarity_grader_roundtrip() {
+        let grader = TextSimilarityGrader {
+            evaluation_metric: TextSimilarityGraderEvaluationMetric::Cosine,
+            input: "some text".to_owned(),
+            name: "cosine_sim".to_owned(),
+            reference: "reference text".to_owned(),
+            grader_type: "text_similarity".to_owned(),
+        };
+
+        let json = serde_json::to_string(&grader).expect("serialize");
+        let parsed: TextSimilarityGrader = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            parsed.evaluation_metric,
+            TextSimilarityGraderEvaluationMetric::Cosine
+        );
+    }
+
+    #[test]
+    fn python_grader_roundtrip() {
+        let grader = PythonGrader {
+            name: "my_grader".to_owned(),
+            source: "def grade(sample, item): return 1.0".to_owned(),
+            grader_type: "python".to_owned(),
+            image_tag: None,
+        };
+
+        let json = serde_json::to_string(&grader).expect("serialize");
+        let parsed: PythonGrader = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.name, "my_grader");
+        assert!(parsed.image_tag.is_none());
+    }
+
+    #[test]
+    fn python_grader_with_image_tag() {
+        let grader = PythonGrader {
+            name: "tagged".to_owned(),
+            source: "pass".to_owned(),
+            grader_type: "python".to_owned(),
+            image_tag: Some("3.11".to_owned()),
+        };
+
+        let value = serde_json::to_value(&grader).expect("serialize");
+        assert_eq!(value["image_tag"].as_str().unwrap(), "3.11");
+    }
+
+    #[test]
+    fn score_model_grader_roundtrip() {
+        let grader = ScoreModelGrader {
+            input: vec![ScoreModelGraderInput {
+                content: ScoreModelGraderInputContent::Text("score this".to_owned()),
+                role: ScoreModelGraderInputRole::User,
+                input_type: Some("message".to_owned()),
+            }],
+            model: "gpt-4o".to_owned(),
+            name: "quality".to_owned(),
+            grader_type: "score_model".to_owned(),
+            range: Some(vec![0.0, 1.0]),
+            sampling_params: None,
+        };
+
+        let json = serde_json::to_string(&grader).expect("serialize");
+        let parsed: ScoreModelGrader = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.model, "gpt-4o");
+        assert_eq!(parsed.range.unwrap(), vec![0.0, 1.0]);
+    }
+
+    #[test]
+    fn label_model_grader_roundtrip() {
+        let grader = LabelModelGrader {
+            input: vec![LabelModelGraderInput {
+                content: LabelModelGraderInputContent::Text("classify this".to_owned()),
+                role: ScoreModelGraderInputRole::User,
+                input_type: Some("message".to_owned()),
+            }],
+            labels: vec!["good".to_owned(), "bad".to_owned()],
+            model: "gpt-4o".to_owned(),
+            name: "classifier".to_owned(),
+            passing_labels: vec!["good".to_owned()],
+            grader_type: "label_model".to_owned(),
+        };
+
+        let json = serde_json::to_string(&grader).expect("serialize");
+        let parsed: LabelModelGrader = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.labels, vec!["good", "bad"]);
+        assert_eq!(parsed.passing_labels, vec!["good"]);
+    }
+
+    #[test]
+    fn multi_grader_roundtrip() {
+        let mut graders = HashMap::new();
+        graders.insert(
+            "exact".to_owned(),
+            Grader::StringCheck(StringCheckGraderFields {
+                input: "{{output}}".to_owned(),
+                name: "exact".to_owned(),
+                operation: StringCheckGraderOperation::Eq,
+                reference: "expected".to_owned(),
+            }),
+        );
+
+        let grader = MultiGrader {
+            calculate_output: "exact".to_owned(),
+            graders,
+            name: "combined".to_owned(),
+            grader_type: "multi".to_owned(),
+        };
+
+        let json = serde_json::to_string(&grader).expect("serialize");
+        let parsed: MultiGrader = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.name, "combined");
+        assert!(parsed.graders.contains_key("exact"));
+    }
+
+    #[test]
+    fn grader_union_string_check_deserializes() {
+        let json = r#"{
+            "type": "string_check",
+            "input": "{{output}}",
+            "name": "test",
+            "operation": "eq",
+            "reference": "expected"
+        }"#;
+
+        let grader: Grader = serde_json::from_str(json).expect("deserialize grader union");
+        match grader {
+            Grader::StringCheck(fields) => {
+                assert_eq!(fields.name, "test");
+                assert_eq!(fields.operation, StringCheckGraderOperation::Eq);
+            }
+            _ => panic!("Expected StringCheck variant"),
+        }
+    }
+
+    #[test]
+    fn grader_union_python_deserializes() {
+        let json = r#"{
+            "type": "python",
+            "name": "py_grader",
+            "source": "def grade(s, i): return 1.0"
+        }"#;
+
+        let grader: Grader = serde_json::from_str(json).expect("deserialize grader union");
+        match grader {
+            Grader::Python(fields) => {
+                assert_eq!(fields.name, "py_grader");
+                assert!(fields.image_tag.is_none());
+            }
+            _ => panic!("Expected Python variant"),
+        }
+    }
+
+    #[test]
+    fn grader_union_text_similarity_deserializes() {
+        let json = r#"{
+            "type": "text_similarity",
+            "evaluation_metric": "cosine",
+            "input": "hello",
+            "name": "sim",
+            "reference": "hello world"
+        }"#;
+
+        let grader: Grader = serde_json::from_str(json).expect("deserialize grader union");
+        match grader {
+            Grader::TextSimilarity(fields) => {
+                assert_eq!(
+                    fields.evaluation_metric,
+                    TextSimilarityGraderEvaluationMetric::Cosine
+                );
+            }
+            _ => panic!("Expected TextSimilarity variant"),
+        }
+    }
+
+    #[test]
+    fn string_check_operation_variants() {
+        for (s, expected) in [
+            ("\"eq\"", StringCheckGraderOperation::Eq),
+            ("\"ne\"", StringCheckGraderOperation::Ne),
+            ("\"like\"", StringCheckGraderOperation::Like),
+            ("\"ilike\"", StringCheckGraderOperation::Ilike),
+        ] {
+            let parsed: StringCheckGraderOperation =
+                serde_json::from_str(s).expect("deserialize op");
+            assert_eq!(parsed, expected);
+        }
+    }
+
+    #[test]
+    fn text_similarity_all_metrics() {
+        let metrics = [
+            "cosine",
+            "fuzzy_match",
+            "bleu",
+            "gleu",
+            "meteor",
+            "rouge_1",
+            "rouge_2",
+            "rouge_3",
+            "rouge_4",
+            "rouge_5",
+            "rouge_l",
+        ];
+        for m in &metrics {
+            let json = format!("\"{}\"", m);
+            let parsed: TextSimilarityGraderEvaluationMetric =
+                serde_json::from_str(&json).expect("deserialize metric");
+            let serialized = serde_json::to_string(&parsed).expect("serialize metric");
+            assert_eq!(serialized, json);
+        }
     }
 }

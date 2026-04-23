@@ -11,8 +11,9 @@ workspace = true
 [dependencies]
 openai = { path = "../openai", default-features = false, optional = true }
 azure_core = { version = "0.22", optional = true }
+urlencoding = { version = "2", optional = true }
 
 [features]
 default = []
-config = ["dep:openai"]
+config = ["dep:openai", "dep:urlencoding"]
 azure = ["config", "dep:azure_core"]

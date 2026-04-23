@@ -1,7 +1,9 @@
 //! Integration tests for fine-tuning jobs and batches services.
 
 use openai::{
-    batches::BatchCreateParams, fine_tuning::FineTuningJobCreateParams, Client, ClientConfig,
+    batches::{BatchCompletionWindow, BatchCreateParams, BatchEndpoint},
+    fine_tuning::FineTuningJobCreateParams,
+    Client, ClientConfig,
 };
 use serde_json::json;
 use wiremock::{
@@ -106,6 +108,10 @@ async fn fine_tuning_jobs_round_trip() {
             validation_file: None,
             suffix: None,
             metadata: None,
+            seed: None,
+            integrations: None,
+            hyperparameters: None,
+            method: None,
         })
         .await
         .expect("create fine-tuning job");
@@ -199,9 +205,10 @@ async fn batches_round_trip() {
     let created = batches
         .create(BatchCreateParams {
             input_file_id: "file_input".to_owned(),
-            endpoint: "/v1/responses".to_owned(),
-            completion_window: "24h".to_owned(),
+            endpoint: BatchEndpoint::V1Responses,
+            completion_window: BatchCompletionWindow::TwentyFourHours,
             metadata: None,
+            output_expires_after: None,
         })
         .await
         .expect("create batch");
@@ -210,7 +217,7 @@ async fn batches_round_trip() {
     let got = batches.get("batch_1").await.expect("get batch");
     assert_eq!(got.status, "completed");
 
-    let listed = batches.list().await.expect("list batches");
+    let listed = batches.list(None).await.expect("list batches");
     assert_eq!(listed.data.len(), 1);
 
     let cancelled = batches.cancel("batch_1").await.expect("cancel batch");

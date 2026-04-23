@@ -64,9 +64,12 @@ pub struct Model {
     pub id: ModelId,
     /// Object type.
     pub object: String,
-    /// Owner org.
+    /// Unix timestamp (in seconds) when the model was created.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owned_by: Option<String>,
+    pub created: Option<i64>,
+    /// Owner org.
+    #[serde(default)]
+    pub owned_by: String,
 }
 
 /// Model delete response.
@@ -82,18 +85,34 @@ pub struct DeletedModel {
 
 #[cfg(test)]
 mod tests {
-    use super::{DeletedModel, ModelList};
+    use super::{DeletedModel, Model, ModelList};
 
     #[test]
     fn model_list_deserializes_model_ids() {
         let json = r#"{
             "object":"list",
-            "data":[{"id":"gpt-4o-mini","object":"model","owned_by":"openai"}]
+            "data":[{"id":"gpt-4o-mini","object":"model","owned_by":"openai","created":1700000000}]
         }"#;
 
         let list: ModelList = serde_json::from_str(json).expect("deserialize model list");
         assert_eq!(list.data.len(), 1);
         assert_eq!(list.data[0].id.as_ref(), "gpt-4o-mini");
+        assert_eq!(list.data[0].created, Some(1_700_000_000));
+        assert_eq!(list.data[0].owned_by, "openai");
+    }
+
+    #[test]
+    fn model_without_created_field() {
+        let json = r#"{"id":"gpt-4","object":"model","owned_by":"openai"}"#;
+        let model: Model = serde_json::from_str(json).expect("deserialize model without created");
+        assert!(model.created.is_none());
+    }
+
+    #[test]
+    fn model_without_owned_by_defaults() {
+        let json = r#"{"id":"gpt-4","object":"model"}"#;
+        let model: Model = serde_json::from_str(json).expect("deserialize model without owned_by");
+        assert_eq!(model.owned_by, "");
     }
 
     #[test]

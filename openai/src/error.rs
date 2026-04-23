@@ -62,6 +62,10 @@ pub enum Error {
     #[error("Stream error: {0}")]
     Stream(String),
 
+    /// Authentication failed.
+    #[error("Auth error: {0}")]
+    Auth(#[from] crate::auth::AuthError),
+
     /// Invalid client configuration.
     #[error("Invalid client config `{field}`: {message}")]
     Config {
