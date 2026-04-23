@@ -2,7 +2,7 @@
 
 use openai::{
     audio::{AudioInputFile, AudioTranslationCreateParams},
-    images::{ImageInputFile, ImageVariationParams},
+    images::{ImageInputFile, ImageResponseFormat, ImageSize, ImageVariationParams},
     shared::ModelId,
     Client, ClientConfig,
 };
@@ -44,6 +44,7 @@ async fn audio_translate_round_trip() {
             model: ModelId::from("gpt-4o-mini-transcribe"),
             prompt: None,
             temperature: None,
+            response_format: None,
         })
         .await
         .expect("audio translate");
@@ -74,8 +75,9 @@ async fn images_create_variation_round_trip() {
                 .with_content_type("image/png"),
             model: Some(ModelId::from("gpt-image-1")),
             n: Some(1),
-            size: Some("1024x1024".to_owned()),
-            response_format: Some("url".to_owned()),
+            size: Some(ImageSize::Size1024x1024),
+            response_format: Some(ImageResponseFormat::Url),
+            user: None,
         })
         .await
         .expect("image variation");

@@ -1,10 +1,12 @@
 //! Integration tests for service endpoints.
 
 use openai::{
-    chat::{ChatCompletionCreateParams, ChatMessageParam, ChatRole},
+    chat::{
+        ChatCompletionCreateParams, ChatCompletionMessageParam, ChatCompletionUserMessageContent,
+    },
     completions::CompletionCreateParams,
     embeddings::EmbeddingCreateParams,
-    moderations::ModerationCreateParams,
+    moderations::{ModerationCreateParams, ModerationInput},
     param::OneOrMany,
     shared::ModelId,
     Client, ClientConfig,
@@ -51,12 +53,43 @@ async fn chat_create_round_trip() {
         .completions()
         .create(ChatCompletionCreateParams {
             model: ModelId::from("gpt-4o-mini"),
-            messages: vec![ChatMessageParam {
-                role: ChatRole::User,
-                content: "Hello".to_owned(),
+            messages: vec![ChatCompletionMessageParam::User {
+                content: ChatCompletionUserMessageContent::Text("Hello".to_owned()),
+                name: None,
             }],
             stream: None,
             temperature: None,
+            frequency_penalty: None,
+            presence_penalty: None,
+            max_completion_tokens: None,
+            max_tokens: None,
+            n: None,
+            top_p: None,
+            seed: None,
+            store: None,
+            logprobs: None,
+            top_logprobs: None,
+            stop: None,
+            response_format: None,
+            tools: None,
+            tool_choice: None,
+            parallel_tool_calls: None,
+            user: None,
+            service_tier: None,
+            metadata: None,
+            reasoning_effort: None,
+            stream_options: None,
+            audio: None,
+            logit_bias: None,
+            modalities: None,
+            prompt_cache_key: None,
+            prompt_cache_retention: None,
+            safety_identifier: None,
+            verbosity: None,
+            prediction: None,
+            web_search_options: None,
+            function_call: None,
+            functions: None,
         })
         .await
         .expect("chat completion");
@@ -85,9 +118,10 @@ async fn completions_create_round_trip() {
         .completions()
         .create(CompletionCreateParams {
             model: ModelId::from("gpt-3.5-turbo-instruct"),
-            prompt: "Hello".to_owned(),
+            prompt: openai::completions::CompletionPrompt::Single("Hello".to_owned()),
             max_tokens: Some(16),
             temperature: None,
+            ..Default::default()
         })
         .await
         .expect("completion");
@@ -118,6 +152,8 @@ async fn embeddings_create_round_trip() {
             model: ModelId::from("text-embedding-3-small"),
             input: OneOrMany::One("hello".to_owned()),
             dimensions: None,
+            user: None,
+            encoding_format: None,
         })
         .await
         .expect("embedding response");
@@ -176,7 +212,25 @@ async fn moderations_create_round_trip() {
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "id":"modr_123",
             "model":"omni-moderation-latest",
-            "results":[{"flagged":false}]
+            "results":[{
+                "flagged":false,
+                "categories":{
+                    "harassment":false,"harassment/threatening":false,
+                    "hate":false,"hate/threatening":false,
+                    "illicit":false,"illicit/violent":false,
+                    "self-harm":false,"self-harm/instructions":false,"self-harm/intent":false,
+                    "sexual":false,"sexual/minors":false,
+                    "violence":false,"violence/graphic":false
+                },
+                "category_scores":{
+                    "harassment":0.0,"harassment/threatening":0.0,
+                    "hate":0.0,"hate/threatening":0.0,
+                    "illicit":0.0,"illicit/violent":0.0,
+                    "self-harm":0.0,"self-harm/instructions":0.0,"self-harm/intent":0.0,
+                    "sexual":0.0,"sexual/minors":0.0,
+                    "violence":0.0,"violence/graphic":0.0
+                }
+            }]
         })))
         .mount(&server)
         .await;
@@ -186,7 +240,7 @@ async fn moderations_create_round_trip() {
         .moderations()
         .create(ModerationCreateParams {
             model: Some(ModelId::from("omni-moderation-latest")),
-            input: OneOrMany::One("hello".to_owned()),
+            input: ModerationInput::from("hello"),
         })
         .await
         .expect("moderation response");

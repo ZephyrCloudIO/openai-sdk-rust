@@ -62,7 +62,7 @@ async fn files_list_get_delete_round_trip() {
 
     let client = test_client(&server);
 
-    let files = client.files().list().await.expect("files list");
+    let files = client.files().list(None).await.expect("files list");
     assert_eq!(files.data.len(), 1);
     assert_eq!(files.data[0].id, "file_1");
 
@@ -85,7 +85,7 @@ async fn uploads_get_and_cancel_round_trip() {
             "bytes":5,
             "filename":"input.bin",
             "purpose":"assistants",
-            "status":"in_progress"
+            "status":"pending"
         })))
         .mount(&server)
         .await;
@@ -106,12 +106,15 @@ async fn uploads_get_and_cancel_round_trip() {
     let client = test_client(&server);
 
     let upload = client.uploads().get("upload_1").await.expect("upload get");
-    assert_eq!(upload.status.as_deref(), Some("in_progress"));
+    assert_eq!(upload.status, Some(openai::uploads::UploadStatus::Pending));
 
     let cancelled = client
         .uploads()
         .cancel("upload_1")
         .await
         .expect("upload cancel");
-    assert_eq!(cancelled.status.as_deref(), Some("cancelled"));
+    assert_eq!(
+        cancelled.status,
+        Some(openai::uploads::UploadStatus::Cancelled)
+    );
 }
